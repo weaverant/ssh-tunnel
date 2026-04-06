@@ -1,0 +1,62 @@
+# Hardened SSH tunnel-only server configuration
+
+Port 2222
+AddressFamily any
+ListenAddress 0.0.0.0
+
+# Host key - ED25519 only
+HostKey /etc/ssh/host_keys/ssh_host_ed25519_key
+HostKeyAlgorithms ssh-ed25519
+
+# Key exchange - PQC hybrid preferred, classical fallback
+KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512@openssh.com,curve25519-sha256
+
+# Ciphers - AEAD only
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
+
+# MACs - only needed for non-AEAD ciphers (belt and suspenders)
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+
+# Logging
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Authentication - key only
+AuthenticationMethods publickey
+PubkeyAuthentication yes
+PubkeyAcceptedAlgorithms ssh-ed25519
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+PermitRootLogin no
+MaxAuthTries 3
+LoginGraceTime 30
+StrictModes yes
+AuthorizedKeysFile /etc/ssh/authorized_keys
+
+# Forwarding - local TCP only
+AllowTcpForwarding local
+AllowStreamLocalForwarding no
+GatewayPorts no
+PermitTunnel no
+X11Forwarding no
+AllowAgentForwarding no
+
+# Session lockdown
+PermitTTY no
+ForceCommand /sbin/nologin
+PermitUserRC no
+PermitUserEnvironment no
+
+# No info leakage
+PrintMotd no
+Banner none
+VersionAddendum none
+
+# Connection management
+ClientAliveInterval 300
+ClientAliveCountMax 2
+MaxSessions 10
+
+# Privilege separation (default, cannot be disabled)
+# Privsep user: sshd, chroot dir: /var/empty

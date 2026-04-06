@@ -1,0 +1,22 @@
+services:
+  ssh-tunnel:
+    build: .
+    ports:
+      - "2222:2222"
+    volumes:
+      - ./host_keys/ssh_host_ed25519_key:/etc/ssh/host_keys/ssh_host_ed25519_key:ro
+      - ./authorized_keys:/etc/ssh/authorized_keys:ro
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID       # privsep user switching
+      - SETGID       # privsep group switching
+      - SYS_CHROOT   # privsep chroot
+      - DAC_OVERRIDE  # read host key / authorized_keys
+    restart: unless-stopped
