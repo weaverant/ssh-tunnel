@@ -1,7 +1,7 @@
 # Stage 1: Gather sshd and its runtime dependencies
 FROM alpine:edge AS builder
 
-RUN apk add --no-cache openssh-server
+RUN apk add --no-cache --upgrade openssh-server
 
 # Build the minimal filesystem
 RUN mkdir -p /jail/etc/ssh/host_keys \
