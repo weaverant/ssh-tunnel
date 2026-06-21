@@ -37,6 +37,38 @@ Connect:
 ssh -p 2222 -N -L 8080:internal-host:80 tunnel@gateway
 ```
 
+## Published image
+
+Prebuilt images are published to the GitHub Container Registry, so you don't have to build locally:
+
+```bash
+docker pull ghcr.io/weaverant/ssh-tunnel:latest
+```
+
+Available tags:
+
+| Tag | Tracks |
+|---|---|
+| `latest` | Newest release |
+| `0.1.2` | A specific pinned release |
+| `0.1` | Latest patch within a major.minor line |
+
+To run the published image directly with the same hardening as `docker-compose.yml`:
+
+```bash
+docker run -d --name ssh-tunnel \
+  -p 2222:2222 \
+  --read-only --tmpfs /run --tmpfs /tmp \
+  --security-opt no-new-privileges:true \
+  --cap-drop ALL \
+  --cap-add SETUID --cap-add SETGID --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
+  -v "$PWD/host_keys/ssh_host_ed25519_key:/etc/ssh/host_keys/ssh_host_ed25519_key:ro" \
+  -v "$PWD/authorized_keys:/etc/ssh/authorized_keys:ro" \
+  ghcr.io/weaverant/ssh-tunnel:latest
+```
+
+Or point `docker-compose.yml` at the published image by replacing `build: .` with `image: ghcr.io/weaverant/ssh-tunnel:latest`.
+
 ## Configuration
 
 All hardening is baked into the image. No environment variables, no runtime configuration.
