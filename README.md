@@ -1,6 +1,6 @@
 # ssh-tunnel
 
-Minimal, hardened, distroless SSH container for TCP port forwarding. Built on OpenSSH 10.3 with post-quantum cryptography (PQC) key exchange.
+Minimal, hardened, distroless SSH container for TCP port forwarding. Built on OpenSSH 10.4 with post-quantum cryptography (PQC) key exchange.
 
 ## Features
 
