@@ -1,7 +1,7 @@
 # Stage 1: Gather sshd and its runtime dependencies
 FROM alpine:edge AS builder
 
-RUN apk add --no-cache --upgrade openssh-server
+RUN apk add --no-cache --upgrade openssh-server gcc musl-dev
 
 # Build the minimal filesystem
 RUN mkdir -p /jail/etc/ssh/host_keys \
@@ -17,9 +17,8 @@ RUN mkdir -p /jail/etc/ssh/host_keys \
     mkdir -p /jail/usr/lib/ssh && \
     cp /usr/lib/ssh/sshd-session /jail/usr/lib/ssh/ && \
     cp /usr/lib/ssh/sshd-auth /jail/usr/lib/ssh/ && \
-    cp /sbin/nologin /jail/sbin/ && \
     # Copy shared library dependencies for all binaries
-    for bin in /usr/sbin/sshd /usr/lib/ssh/sshd-session /usr/lib/ssh/sshd-auth /sbin/nologin; do \
+    for bin in /usr/sbin/sshd /usr/lib/ssh/sshd-session /usr/lib/ssh/sshd-auth; do \
       ldd "$bin" 2>/dev/null | awk '/=>/ {print $3}' | while read lib; do \
         if [ -n "$lib" ] && [ -f "$lib" ]; then \
           dir=$(dirname "$lib"); \
@@ -42,6 +41,12 @@ RUN mkdir -p /jail/etc/ssh/host_keys \
     chown root:root /jail/var/empty && \
     chmod 700 /jail/home/tunnel/.ssh && \
     chown 1000:1000 /jail/home/tunnel/.ssh
+
+# Static nologin - Alpine's /sbin/nologin is busybox, which would smuggle a
+# full shell into the distroless image (see nologin.c)
+COPY nologin.c /tmp/nologin.c
+RUN gcc -static -Os -s -Wall -Wextra -o /jail/sbin/nologin /tmp/nologin.c && \
+    chmod 755 /jail/sbin/nologin
 
 # Stage 2: Distroless runtime
 FROM scratch

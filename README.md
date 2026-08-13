@@ -1,10 +1,11 @@
 # ssh-tunnel
 
-Minimal, hardened, distroless SSH container for TCP port forwarding. Built on OpenSSH 10.4 with post-quantum cryptography (PQC) key exchange.
+Minimal, hardened, distroless SSH container for TCP port forwarding. Built on OpenSSH 10.5 with post-quantum cryptography (PQC) key exchange.
 
 ## Features
 
 - **Distroless** -- `FROM scratch`, no shell, no package manager (~8MB image)
+- **No busybox** -- `/sbin/nologin` is a static stub, not Alpine's multi-call binary
 - **PQC key exchange** -- ML-KEM-768 hybrid (FIPS 203) with X25519 fallback
 - **ED25519 only** -- host keys and user authentication
 - **Tunnel-only** -- local TCP forwarding, no shell, no SFTP, no SCP
@@ -50,7 +51,7 @@ Available tags:
 | Tag | Tracks |
 |---|---|
 | `latest` | Newest release |
-| `0.1.2` | A specific pinned release |
+| `0.1.4` | A specific pinned release |
 | `0.1` | Latest patch within a major.minor line |
 
 To run the published image directly with the same hardening as `docker-compose.yml`:
@@ -102,6 +103,7 @@ The container expects two bind mounts:
 | Capabilities | All dropped, only SETUID/SETGID/SYS_CHROOT/DAC_OVERRIDE added |
 | Privilege escalation | Blocked (`no-new-privileges`) |
 | Base image | `scratch` (no shell, no package manager) |
+| Binaries present | `sshd`, `sshd-session`, `sshd-auth`, static `nologin` -- nothing else |
 
 ## Building
 
