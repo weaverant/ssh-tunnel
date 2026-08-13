@@ -111,6 +111,17 @@ The container expects two bind mounts:
 docker build -t ssh-tunnel .
 ```
 
+## Testing
+
+`tests/smoke.sh` builds the image, stands up an nginx backend, an ssh-tunnel container with the full `docker-compose.yml` hardening and an SSH client on a private network, then forwards a port through the tunnel and fetches the backend through it. Needs only docker.
+
+```bash
+./tests/smoke.sh                                          # build from this tree and test
+IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.4 ./tests/smoke.sh  # test a published image
+```
+
+It checks the reported OpenSSH version, that `/sbin/nologin` is the static stub rather than busybox, that the port forward reaches the backend, and that a shell session is refused. Exits non-zero on any failure.
+
 ## License
 
 MIT

@@ -1,2 +1,3 @@
 host_keys/
 authorized_keys
+tests/temp/
