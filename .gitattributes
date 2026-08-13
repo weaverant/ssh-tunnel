@@ -1,0 +1,4 @@
+# Everything here is consumed by Linux tooling -- shell scripts run by bash and
+# sshd_config copied into the image. Keep the working tree LF on Windows too, or
+# a local build bakes a CRLF config into the image and tests/smoke.sh will not run.
+* text=auto eol=lf
