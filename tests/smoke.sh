@@ -3,7 +3,7 @@
 # End-to-end smoke test for the ssh-tunnel image.
 #
 #   ./tests/smoke.sh                              build from this tree and test
-#   IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.4 ./tests/smoke.sh    test a published image
+#   IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.5 ./tests/smoke.sh    test a published image
 #
 # Spins up three containers on a private network -- an nginx backend, the
 # ssh-tunnel image under test, and an SSH client -- then forwards a port

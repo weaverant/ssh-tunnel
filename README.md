@@ -51,7 +51,7 @@ Available tags:
 | Tag | Tracks |
 |---|---|
 | `latest` | Newest release |
-| `0.1.4` | A specific pinned release |
+| `0.1.5` | A specific pinned release |
 | `0.1` | Latest patch within a major.minor line |
 
 To run the published image directly with the same hardening as `docker-compose.yml`:
@@ -117,7 +117,7 @@ docker build -t ssh-tunnel .
 
 ```bash
 ./tests/smoke.sh                                          # build from this tree and test
-IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.4 ./tests/smoke.sh  # test a published image
+IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.5 ./tests/smoke.sh  # test a published image
 ```
 
 It checks the reported OpenSSH version, that `/sbin/nologin` is the static stub rather than busybox, that the port forward reaches the backend, and that a shell session is refused. Exits non-zero on any failure.
