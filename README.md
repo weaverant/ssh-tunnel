@@ -106,6 +106,10 @@ The container expects two bind mounts:
 | Base image | `scratch` (no shell, no package manager) |
 | Binaries present | `sshd`, `sshd-session`, `sshd-auth`, static `nologin` -- nothing else |
 
+### Post-quantum status
+
+Key exchange is post-quantum (ML-KEM-768 hybrid). Host and user authentication are not yet: the image accepts ED25519 keys only. OpenSSH 10.6 adds the hybrid `ssh-mldsa44-ed25519` signature type and the sshd in this image supports it, but the baked-in config does not enable it, because few clients other than OpenSSH 10.6 can use it yet. Opt-in support is planned, see [ROADMAP.md](ROADMAP.md).
+
 ## Building
 
 ```bash
