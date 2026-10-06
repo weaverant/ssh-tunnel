@@ -1,6 +1,6 @@
 # ssh-tunnel
 
-Minimal, hardened, distroless SSH container for TCP port forwarding. Built on OpenSSH 10.5 with post-quantum cryptography (PQC) key exchange.
+Minimal, hardened, distroless SSH container for TCP port forwarding. Built on OpenSSH 10.6 with post-quantum cryptography (PQC) key exchange.
 
 ## Features
 
@@ -51,7 +51,7 @@ Available tags:
 | Tag | Tracks |
 |---|---|
 | `latest` | Newest release |
-| `0.1.5` | A specific pinned release |
+| `0.1.6` | A specific pinned release |
 | `0.1` | Latest patch within a major.minor line |
 
 To run the published image directly with the same hardening as `docker-compose.yml`:
@@ -90,6 +90,7 @@ The container expects two bind mounts:
 | Authentication | Public key only (ED25519) |
 | Key exchange | `mlkem768x25519-sha256`, `sntrup761x25519-sha512`, `curve25519-sha256` |
 | Ciphers | `chacha20-poly1305`, `aes256-gcm` |
+| Compression | Disabled |
 | Forwarding | Local TCP only |
 | Shell access | None (`ForceCommand /sbin/nologin`, `PermitTTY no`) |
 | SFTP/SCP | Disabled |
@@ -117,7 +118,7 @@ docker build -t ssh-tunnel .
 
 ```bash
 ./tests/smoke.sh                                          # build from this tree and test
-IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.5 ./tests/smoke.sh  # test a published image
+IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.6 ./tests/smoke.sh  # test a published image
 ```
 
 It checks the reported OpenSSH version, that `/sbin/nologin` is the static stub rather than busybox, that the port forward reaches the backend, and that a shell session is refused. Exits non-zero on any failure.

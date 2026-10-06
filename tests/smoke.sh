@@ -3,7 +3,7 @@
 # End-to-end smoke test for the ssh-tunnel image.
 #
 #   ./tests/smoke.sh                              build from this tree and test
-#   IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.5 ./tests/smoke.sh    test a published image
+#   IMAGE=ghcr.io/weaverant/ssh-tunnel:0.1.6 ./tests/smoke.sh    test a published image
 #
 # Spins up three containers on a private network -- an nginx backend, the
 # ssh-tunnel image under test, and an SSH client -- then forwards a port
@@ -40,7 +40,9 @@ cleanup
 if [ -z "$IMAGE" ]; then
 	IMAGE=ssh-tunnel:smoke
 	echo "=== building $IMAGE from this tree ==="
-	docker build -q -t "$IMAGE" . >/dev/null
+	# No layer cache: the Dockerfile's apk line never changes, so a cached layer
+	# keeps serving whatever OpenSSH Alpine edge had when it was first built.
+	docker build -q --pull --no-cache -t "$IMAGE" . >/dev/null
 else
 	echo "=== testing published image $IMAGE ==="
 	docker pull -q "$IMAGE" >/dev/null
@@ -67,7 +69,8 @@ COPY --chmod=0600 client_key /root/.ssh/id_ed25519
 EOF
 
 docker build -q -f "$WORK/Dockerfile.server" -t ssh-tunnel-smoke-server "$WORK" >/dev/null
-docker build -q -f "$WORK/Dockerfile.client" -t ssh-tunnel-smoke-client "$WORK" >/dev/null
+# Uncached for the same reason as the image build above
+docker build -q --pull --no-cache -f "$WORK/Dockerfile.client" -t ssh-tunnel-smoke-client "$WORK" >/dev/null
 
 docker network create "$NET" >/dev/null
 docker run -d --name "$WEB" --network "$NET" nginx:alpine >/dev/null
