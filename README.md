@@ -87,6 +87,8 @@ The container expects two bind mounts:
 
 sshd looks for `ssh_host_ed25519_key` and `ssh_host_mldsa44_ed25519_key` in the host key directory and runs on whichever it finds. A deployment that mounts the single ED25519 key file, as documented before 0.2.0, keeps working unchanged.
 
+`authorized_keys` is mounted as a single file, so the container only sees changes made to that file in place. A key appended with `cat user.pub >> authorized_keys` works at once. If the file is replaced, as most editors and configuration tools do when they save, the container keeps using the old content until it is restarted. **Restart the container after removing a key**, or the removed key stays valid.
+
 ## Post-quantum authentication (ML-DSA)
 
 Key exchange is always post-quantum (ML-KEM-768 hybrid). Authentication uses ED25519 keys by default. Since 0.2.0 the image also accepts `ssh-mldsa44-ed25519`, the hybrid post-quantum signature type introduced in OpenSSH 10.6, for host keys and for user keys. Nothing changes until you opt in, and both key types work side by side.
@@ -116,7 +118,7 @@ That line is expected and harmless: sshd runs on the keys it finds.
 
    If your setup still mounts the single ED25519 key file, mount the directory instead (`./host_keys:/etc/ssh/host_keys:ro`) and recreate the container. Existing clients notice nothing. OpenSSH 10.6 clients that already know the host learn the new key on their next connection.
 
-2. **Add ML-DSA user keys.** Each user creates one with `ssh-keygen -t mldsa44-ed25519` and you append the public key to `authorized_keys`. No restart is needed, and the ED25519 keys keep working.
+2. **Add ML-DSA user keys.** Each user creates one with `ssh-keygen -t mldsa44-ed25519` and you append the public key to `authorized_keys` (`cat user.pub >> authorized_keys`). An appended key works at once, and the ED25519 keys keep working.
 
 3. **Let clients verify the host with ML-DSA.** While both host keys are present, clients choose ED25519. To use the ML-DSA host key already, set this on the client:
 
