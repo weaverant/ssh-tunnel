@@ -4,7 +4,8 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      - ./host_keys/ssh_host_ed25519_key:/etc/ssh/host_keys/ssh_host_ed25519_key:ro
+      # ssh_host_ed25519_key and/or ssh_host_mldsa44_ed25519_key, see README
+      - ./host_keys:/etc/ssh/host_keys:ro
       - ./authorized_keys:/etc/ssh/authorized_keys:ro
     read_only: true
     tmpfs:

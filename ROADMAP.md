@@ -1,10 +1,6 @@
 # Roadmap
 
-## 0.2.0: opt-in ML-DSA host and user keys
-
-- [ ] Opt-in `ssh-mldsa44-ed25519` host and user keys: a second `HostKey` line, both types in
-  `HostKeyAlgorithms` and `PubkeyAcceptedAlgorithms`, an ML-DSA case in `tests/smoke.sh`. Local
-  builds only for now; how to publish and announce it is still open. Tried by hand 2026-10-06
-  with 10.6p1 clients on Linux and Windows: login, forwarding and host key rotation work, and an
-  unmounted `HostKey` only logs an error. Traps: clients keep picking ED25519 while both host
-  keys are mounted, and a client without ML-DSA is refused once the ED25519 key is gone.
+- [ ] Decide whether the `0.1` line gets further OpenSSH updates or ends at 0.1.6. Until then
+  new releases go to `0.2` only.
+- [x] 0.2.0 (2026-10-06): opt-in `ssh-mldsa44-ed25519` host and user keys, `ssh-keygen` in the
+  image, host key directory mount. See "Post-quantum authentication (ML-DSA)" in the README.

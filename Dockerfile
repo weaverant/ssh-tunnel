@@ -1,7 +1,7 @@
 # Stage 1: Gather sshd and its runtime dependencies
 FROM alpine:edge AS builder
 
-RUN apk add --no-cache --upgrade openssh-server gcc musl-dev
+RUN apk add --no-cache --upgrade openssh-server openssh-keygen gcc musl-dev
 
 # Build the minimal filesystem
 RUN mkdir -p /jail/etc/ssh/host_keys \
@@ -10,6 +10,7 @@ RUN mkdir -p /jail/etc/ssh/host_keys \
              /jail/run \
              /jail/sbin \
              /jail/usr/sbin \
+             /jail/usr/bin \
              /jail/lib \
              /jail/tmp && \
     # Copy binaries (OpenSSH 10.x splits sshd into three)
@@ -17,8 +18,10 @@ RUN mkdir -p /jail/etc/ssh/host_keys \
     mkdir -p /jail/usr/lib/ssh && \
     cp /usr/lib/ssh/sshd-session /jail/usr/lib/ssh/ && \
     cp /usr/lib/ssh/sshd-auth /jail/usr/lib/ssh/ && \
+    # ssh-keygen, so host keys can be made with the image itself (see README)
+    cp /usr/bin/ssh-keygen /jail/usr/bin/ && \
     # Copy shared library dependencies for all binaries
-    for bin in /usr/sbin/sshd /usr/lib/ssh/sshd-session /usr/lib/ssh/sshd-auth; do \
+    for bin in /usr/sbin/sshd /usr/lib/ssh/sshd-session /usr/lib/ssh/sshd-auth /usr/bin/ssh-keygen; do \
       ldd "$bin" 2>/dev/null | awk '/=>/ {print $3}' | while read lib; do \
         if [ -n "$lib" ] && [ -f "$lib" ]; then \
           dir=$(dirname "$lib"); \
