@@ -38,7 +38,7 @@ PermitRootLogin no
 MaxAuthTries 3
 LoginGraceTime 30
 StrictModes yes
-AuthorizedKeysFile /etc/ssh/authorized_keys
+AuthorizedKeysFile /etc/ssh/authorized_keys /etc/ssh/user_keys/authorized_keys /etc/ssh/user_keys/authorized_keys
 
 # Forwarding - local TCP only
 AllowTcpForwarding local

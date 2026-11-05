@@ -6,7 +6,8 @@ services:
     volumes:
       # ssh_host_ed25519_key and/or ssh_host_mldsa44_ed25519_key, see README
       - ./host_keys:/etc/ssh/host_keys:ro
-      - ./authorized_keys:/etc/ssh/authorized_keys:ro
+      # authorized_keys inside a directory: a replaced file takes effect at once
+      - ./user_keys:/etc/ssh/user_keys:ro
     read_only: true
     tmpfs:
       - /run

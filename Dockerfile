@@ -4,7 +4,7 @@ FROM alpine:edge AS builder
 RUN apk add --no-cache --upgrade openssh-server openssh-keygen gcc musl-dev
 
 # Build the minimal filesystem
-RUN mkdir -p /jail/etc/ssh/host_keys \
+RUN mkdir -p /jail/etc/ssh/host_keys /jail/etc/ssh/user_keys \
              /jail/home/tunnel/.ssh \
              /jail/var/empty \
              /jail/run \

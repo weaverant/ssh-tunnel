@@ -1,3 +1,5 @@
 host_keys/
 authorized_keys
 tests/temp/
+user_keys/
+tests/output/

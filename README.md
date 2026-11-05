@@ -24,10 +24,11 @@ docker run --rm --entrypoint /usr/bin/ssh-keygen -v "$PWD/host_keys:/out" \
 
 The key files are written by the container, so on Linux they belong to root. A local `ssh-keygen -t ed25519 -f host_keys/ssh_host_ed25519_key -N ""` works just as well.
 
-Create an `authorized_keys` file with your public key(s):
+Create a `user_keys` directory with an `authorized_keys` file holding your public key(s):
 
 ```bash
-cp ~/.ssh/id_ed25519.pub authorized_keys
+mkdir user_keys && chmod 755 user_keys
+cp ~/.ssh/id_ed25519.pub user_keys/authorized_keys
 ```
 
 Start the container:
@@ -55,7 +56,7 @@ Available tags:
 | Tag | Tracks |
 |---|---|
 | `latest` | Newest release |
-| `0.2.0` | A specific pinned release |
+| `0.2.1` | A specific pinned release |
 | `0.2` | Latest patch within a major.minor line |
 
 To run the published image directly with the same hardening as `docker-compose.yml`:
@@ -68,7 +69,7 @@ docker run -d --name ssh-tunnel \
   --cap-drop ALL \
   --cap-add SETUID --cap-add SETGID --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
   -v "$PWD/host_keys:/etc/ssh/host_keys:ro" \
-  -v "$PWD/authorized_keys:/etc/ssh/authorized_keys:ro" \
+  -v "$PWD/user_keys:/etc/ssh/user_keys:ro" \
   ghcr.io/weaverant/ssh-tunnel:latest
 ```
 
@@ -83,17 +84,30 @@ The container expects two bind mounts:
 | Mount | Container Path | Mode |
 |---|---|---|
 | Host key directory | `/etc/ssh/host_keys` | `ro`, private keys `0600` |
-| Authorized keys | `/etc/ssh/authorized_keys` | `ro`, `0644` |
+| User key directory | `/etc/ssh/user_keys` | `ro`, directory `0755`, `authorized_keys` `0644` |
 
 sshd looks for `ssh_host_ed25519_key` and `ssh_host_mldsa44_ed25519_key` in the host key directory and runs on whichever it finds. A deployment that mounts the single ED25519 key file, as documented before 0.2.0, keeps working unchanged.
 
-`authorized_keys` is mounted as a single file, so the container only sees changes made to that file in place. A key appended with `cat user.pub >> authorized_keys` works at once. If the file is replaced, as most editors and configuration tools do when they save, the container keeps using the old content until it is restarted. **Restart the container after removing a key**, or the removed key stays valid.
+sshd reads `authorized_keys` from the user key directory at every login, so any change takes effect on the next connection, including a file replaced by an editor or a configuration tool. sshd refuses every login unless the directory and the file are owned by root or by uid 1000 and are not writable by group or others: `0755` works, `0775` does not.
+
+Before 0.2.1 the documented mount was the single file (`./authorized_keys:/etc/ssh/authorized_keys:ro`). It still works, but the container only sees changes made to that file in place: a replaced file keeps serving its old content until the container is restarted, so a removed key stays valid until then. Mount one or the other, not both, or keys from both files are accepted.
 
 ## Post-quantum authentication (ML-DSA)
 
 Key exchange is always post-quantum (ML-KEM-768 hybrid). Authentication uses ED25519 keys by default. Since 0.2.0 the image also accepts `ssh-mldsa44-ed25519`, the hybrid post-quantum signature type introduced in OpenSSH 10.6, for host keys and for user keys. Nothing changes until you opt in, and both key types work side by side.
 
 A client needs OpenSSH 10.6 or newer to use ML-DSA. Older clients keep working with ED25519 for as long as the ED25519 keys stay in place.
+
+### Upgrading from 0.2.0
+
+Pull the new image and restart. No configuration change is needed. To have a removed key take effect without a restart, move the file into the user key directory and switch the mount:
+
+```bash
+mkdir user_keys && chmod 755 user_keys
+mv authorized_keys user_keys/
+```
+
+In `docker-compose.yml`, replace `./authorized_keys:/etc/ssh/authorized_keys:ro` with `./user_keys:/etc/ssh/user_keys:ro`, then recreate the container with `docker compose up -d`.
 
 ### Upgrading from 0.1.x
 
@@ -118,7 +132,7 @@ That line is expected and harmless: sshd runs on the keys it finds.
 
    If your setup still mounts the single ED25519 key file, mount the directory instead (`./host_keys:/etc/ssh/host_keys:ro`) and recreate the container. Existing clients notice nothing. OpenSSH 10.6 clients that already know the host learn the new key on their next connection.
 
-2. **Add ML-DSA user keys.** Each user creates one with `ssh-keygen -t mldsa44-ed25519` and you append the public key to `authorized_keys` (`cat user.pub >> authorized_keys`). An appended key works at once, and the ED25519 keys keep working.
+2. **Add ML-DSA user keys.** Each user creates one with `ssh-keygen -t mldsa44-ed25519` and you append the public key to `authorized_keys` (`cat user.pub >> user_keys/authorized_keys`). An appended key works at once, and the ED25519 keys keep working.
 
 3. **Let clients verify the host with ML-DSA.** While both host keys are present, clients choose ED25519. To use the ML-DSA host key already, set this on the client:
 
@@ -162,14 +176,21 @@ docker build -t ssh-tunnel .
 
 ## Testing
 
-`tests/smoke.sh` builds the image, stands up an nginx backend, two ssh-tunnel containers with the full `docker-compose.yml` hardening (one with only an ED25519 host key, one that also has an ML-DSA host key) and an SSH client on a private network, then forwards a port through the tunnel and fetches the backend through it. Needs only docker.
+`tests/smoke.sh` builds the image, stands up an nginx backend, three ssh-tunnel containers with the full `docker-compose.yml` hardening (one with only an ED25519 host key, one that also has an ML-DSA host key, one that reads its keys from a user key directory) and an SSH client on a private network, then forwards a port through the tunnel and fetches the backend through it. Needs only docker.
 
 ```bash
 ./tests/smoke.sh                                          # build from this tree and test
-IMAGE=ghcr.io/weaverant/ssh-tunnel:0.2.0 ./tests/smoke.sh  # test a published image
+IMAGE=ghcr.io/weaverant/ssh-tunnel:0.2.1 ./tests/smoke.sh  # test a published image
 ```
 
-It checks the reported OpenSSH version, that `/sbin/nologin` is the static stub rather than busybox, that the port forward reaches the backend, that a shell session is refused, that ML-DSA user and host keys work, and that the image's own `ssh-keygen` produces the ML-DSA host key. Exits non-zero on any failure.
+It checks the reported OpenSSH version, that `/sbin/nologin` is the static stub rather than busybox, that the port forward reaches the backend, that a shell session is refused, that ML-DSA user and host keys work, that a key removed from a replaced `user_keys/authorized_keys` is refused without a restart, and that the image's own `ssh-keygen` produces the ML-DSA host key. Exits non-zero on any failure.
+
+`tests/upgrade.sh` runs the upgrade path: the previous release (`:latest` by default, so run it before tagging) in the old layout with a single `authorized_keys` file, then the new image on the same files, then the migration to `user_keys` exactly as described under "Upgrading from 0.2.0". It checks that both user key types keep working, that the host key fingerprints do not change, that a key removed from a replaced file is refused without a restart, and the ownership and mode rules for `user_keys`. The files live on the Docker host (inside the VM on Docker Desktop), so sshd sees real Linux owners and modes. Needs only docker.
+
+```bash
+./tests/upgrade.sh                                          # from :latest to a build of this tree
+OLD=ghcr.io/weaverant/ssh-tunnel:0.2.0 ./tests/upgrade.sh   # from a specific release
+```
 
 ## License
 

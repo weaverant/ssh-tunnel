@@ -3,7 +3,7 @@
 # End-to-end smoke test for the ssh-tunnel image.
 #
 #   ./tests/smoke.sh                              build from this tree and test
-#   IMAGE=ghcr.io/weaverant/ssh-tunnel:0.2.0 ./tests/smoke.sh    test a published image
+#   IMAGE=ghcr.io/weaverant/ssh-tunnel:0.2.1 ./tests/smoke.sh    test a published image
 #
 # Spins up an nginx backend, the ssh-tunnel image under test (twice: with and
 # without an ML-DSA host key) and an SSH client on a private network, then
@@ -24,6 +24,8 @@ NET=ssh-tunnel-smoke-net
 WEB=ssh-tunnel-smoke-web
 SRV=ssh-tunnel-smoke-sshd
 SRV2=ssh-tunnel-smoke-sshd-mldsa
+SRV3=ssh-tunnel-smoke-sshd-userkeys
+VOL=ssh-tunnel-smoke-userkeys
 KG=ssh-tunnel-smoke-keygen
 FAILED=0
 
@@ -31,7 +33,8 @@ pass() { echo "[PASS] $1"; }
 fail() { echo "[FAIL] $1"; FAILED=1; }
 
 cleanup() {
-	docker rm -f "$WEB" "$SRV" "$SRV2" "$KG" >/dev/null 2>&1 || true
+	docker rm -f "$WEB" "$SRV" "$SRV2" "$SRV3" "$KG" >/dev/null 2>&1 || true
+	docker volume rm "$VOL" >/dev/null 2>&1 || true
 	docker network rm "$NET" >/dev/null 2>&1 || true
 	rm -rf "$WORK"
 }
@@ -102,29 +105,48 @@ FROM ssh-tunnel-smoke-server
 COPY --chmod=0600 mldsa_host_key /etc/ssh/host_keys/ssh_host_mldsa44_ed25519_key
 EOF
 
+# Third server: no baked authorized_keys, it reads them from the user key
+# directory. A named volume stands in for the bind mount, since it has real
+# Linux modes where a Windows bind mount reports 0777.
+cat > "$WORK/Dockerfile.server-userkeys" <<EOF
+FROM $IMAGE
+COPY --chmod=0600 host_key /etc/ssh/host_keys/ssh_host_ed25519_key
+EOF
+
 docker build -q -f "$WORK/Dockerfile.server" -t ssh-tunnel-smoke-server "$WORK" >/dev/null
 docker build -q -f "$WORK/Dockerfile.server-mldsa" -t ssh-tunnel-smoke-server-mldsa "$WORK" >/dev/null
+docker build -q -f "$WORK/Dockerfile.server-userkeys" -t ssh-tunnel-smoke-server-userkeys "$WORK" >/dev/null
+
+docker volume create "$VOL" >/dev/null
+docker run --rm -i -v "$VOL:/k" ssh-tunnel-smoke-client sh -c \
+	'cat > /k/authorized_keys && chmod 644 /k/authorized_keys && chmod 755 /k' \
+	< "$WORK/authorized_keys"
 
 docker network create "$NET" >/dev/null
 docker run -d --name "$WEB" --network "$NET" nginx:alpine >/dev/null
 
-# Same hardening as docker-compose.yml
+# Same hardening as docker-compose.yml. Arguments after the image name are
+# extra docker run options, such as a volume.
 start_server() {
-	docker run -d --name "$1" --network "$NET" \
+	name=$1
+	img=$2
+	shift 2
+	docker run -d --name "$name" --network "$NET" \
 		--read-only --tmpfs /run --tmpfs /tmp \
 		--security-opt no-new-privileges:true \
 		--cap-drop ALL \
 		--cap-add SETUID --cap-add SETGID --cap-add SYS_CHROOT --cap-add DAC_OVERRIDE \
-		"$2" >/dev/null
+		"$@" "$img" >/dev/null
 	i=0
 	while [ $i -lt 30 ]; do
-		docker logs "$1" 2>&1 | grep -q "Server listening" && break
+		docker logs "$name" 2>&1 | grep -q "Server listening" && break
 		i=$((i + 1))
 		sleep 1
 	done
 }
 start_server "$SRV" ssh-tunnel-smoke-server
 start_server "$SRV2" ssh-tunnel-smoke-server-mldsa
+start_server "$SRV3" ssh-tunnel-smoke-server-userkeys -v "$VOL:/etc/ssh/user_keys:ro"
 
 echo
 
@@ -189,6 +211,40 @@ MLDSA_HOST=$(docker run --rm --network "$NET" ssh-tunnel-smoke-client sh -c "
 case "$MLDSA_HOST" in
 *"This account is not available"*) pass "ML-DSA host key served" ;;
 *) fail "ML-DSA host key not served: $(echo "$MLDSA_HOST" | tr '\n' ' ')" ;;
+esac
+
+# User key directory: keys are read at every login, so a replaced file takes
+# effect without a restart. The single-file mount pinned the old file.
+login() { # $1 = server, $2 = extra ssh options
+	docker run --rm --network "$NET" ssh-tunnel-smoke-client sh -c "
+		ssh -p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+		    -o IdentitiesOnly=yes $2 \
+		    tunnel@$1 'id' 2>&1
+	" 2>&1 || true
+}
+ED_KEY="-i /root/.ssh/id_ed25519"
+ML_KEY="-i /root/mldsa_client_key"
+
+BEFORE=$(login "$SRV3" "$ED_KEY")
+case "$BEFORE" in
+*"This account is not available"*) pass "key in the user key directory accepted" ;;
+*) fail "key in the user key directory not accepted: $(echo "$BEFORE" | tr '\n' ' ')" ;;
+esac
+
+# Replace the file the way an editor does: write a new one, rename it over.
+docker run --rm -v "$VOL:/k" ssh-tunnel-smoke-client sh -c \
+	'grep "^ssh-mldsa44-ed25519 " /k/authorized_keys > /k/new &&
+	 chmod 644 /k/new && mv /k/new /k/authorized_keys'
+
+REMOVED=$(login "$SRV3" "$ED_KEY")
+KEPT=$(login "$SRV3" "$ML_KEY")
+case "$BEFORE$REMOVED" in
+*"This account is not available"*"Permission denied"*) pass "key removed from a replaced file refused without restart" ;;
+*) fail "removed key still works or failed oddly: $(echo "$REMOVED" | tr '\n' ' ')" ;;
+esac
+case "$KEPT" in
+*"This account is not available"*) pass "key kept in the replaced file still accepted" ;;
+*) fail "kept key not accepted: $(echo "$KEPT" | tr '\n' ' ')" ;;
 esac
 
 if [ "$KEYGEN_OK" = yes ]; then
